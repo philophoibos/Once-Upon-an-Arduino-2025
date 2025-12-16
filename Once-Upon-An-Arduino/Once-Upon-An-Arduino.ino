@@ -9,59 +9,105 @@ Team Members: Alana, Alyssa, Jae
 Servo seasonServo; // scene 2 servo 
 Servo dayServo; // scene 3 servo
 Servo flyServo; // scene 4 servo
-Servo tongueServo; // scene 5-1 servo
-Servo eatServo; // scene 5-2 servo
-int potpin= 0; //analog pin connected to potentiometer
+Servo tongueServo; // scene 5 servo
 int pos = 0; // stores servo position
-int val;
 
-#define LED_PIN 13 // analog pin connected to led
+// flyServo loop parameters
+const int servoStart = 110;  // servo starting speed
+const int servoStop = 90; // servo ending speed
+bool triggered = false; // keeps interaction from being triggered repeatedly
 
-#define PIN_TO_MAGNET 4 // analog pin connected to mag
+#define CIRCUIT_PIN1 8 // analog pin connected to scene 1 circuit
+#define CIRCUIT_PIN2 3 // analog pin connected to scene 3 circuit
+#define CIRCUIT_PIN3 7 // analog pin connected to scene 5 circuit
 
-#define PIN_TO_MOTION 2
-int motionStateCurr = LOW;
-int motionStatePrev = LOW;
+// #define LED_PIN 13 // analog pin connected to led
+const int ledOne = 13;
+
+const int magSens = 2; // analog pin connected to mag
+int magState = LOW;
+
+const int lightSensorPin = A0; // analog pin connected to photoresistor   
+
+int circuit1State; // read circuit flow
+int circuit2State;
+int circuit3State;
 
 void setup() {
-  pinmode(LED_PIN, OUTPUT);
-  pinmode(PIN_TO_MOTION, INPUT);
-  myservo.attach(9);
+  pinMode(ledOne, OUTPUT);
+  pinMode(lightSensorPin, INPUT);
+  pinMode(magSens, INPUT);
+  seasonServo.attach(6);
+  dayServo.attach(5);
+  flyServo.attach(9);
+  tongueServo.attach(10);
   Serial.begin(9600);
-  sensors.begin();
 }
 
 void loop() {
   // Scene 1 - HIGH circuit / LED
-  bool circuitState; // read circuit flow
+  circuit1State = digitalRead(CIRCUIT_PIN1);
+  bool circuitOn = false;
+  Serial.print("circuit1State ");
+  Serial.println(circuit1State);
+
+  if (circuit1State == HIGH) {
+    digitalWrite(ledOne, HIGH);
+    circuitOn = true;
+    Serial.print("Circuit on");
+  } else {
+    digitalWrite(ledOne, LOW);
+    circuitOn = false;
+  }
 
   // Scene 2 - Magnet sensor / servo
+  magState = digitalRead(magSens);
+  //Serial.println("magState ");
+  //Serial.println(magState);
+
+  if (magState == LOW) {
+    //seasonServo.write(100); // spin forward
+  } else {
+    seasonServo.write(90); // stop
+  }
 
   // Scene 3 - HIGH circuit / servo
+  circuit2State = digitalRead(CIRCUIT_PIN2);
 
-  // Scene 4 - Motion sensor / servo
-  motionStatePrev = motionStateCurr; // restore old state
-  motionStateCurr = digitalRead(PIN_TO_MOTION); // read new state
-
-  if (motionStatePrev == LOW && motionStateCurr == HIGH) { // LOW -> HIGH
-    Serial.println("Motion detected");
-  } else if (motionStatePrev == HIGH && motionStateCurr == LOW) { // HIGH -> LOW
-    Serial.println("Motion stop");
+  if (circuit2State == HIGH) {
+    dayServo.write(120); // spin forward
+  } else {
+    dayServo.write(90);
   }
 
-  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
-    // in steps of 1 degree
-    myservo.write(pos);              // tell servo to go to position in variable 'pos'
-    delay(15);                       // waits 15 ms for the servo to reach the position
-  }
-  for (pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
-    myservo.write(pos);              // tell servo to go to position in variable 'pos'
-    delay(15);                       // waits 15 ms for the servo to reach the position
+  // Scene 4 - Light sensor / servo
+  int lightVal = analogRead(lightSensorPin); // read photoresistor state
+  //Serial.print("lightVal ");
+  //Serial.println(lightVal);
+
+  if (lightVal < 100 && circuitOn == false && triggered == false) { // HIGH -> LOW
+    triggered = true;
+
+    // Move from right to left
+    for (int pos = servoStart; pos >= servoStop; pos--) {
+      flyServo.write(pos);
+      delay(15); // Adjust speed (smaller = faster)
+    }
   }
 
   // Scene 5 - LOW circuit / 2 servo
-  val = analogRead(potpin);            // reads the value of the potentiometer (value between 0 and 1023)
-  val = map(val, 0, 1023, 0, 180);     // scale it for use with the servo (value between 0 and 180)
-  myservo.write(val);                  // sets the servo position according to the scaled value
-  delay(15);                           // waits for the servo to get there
+  circuit3State = digitalRead(CIRCUIT_PIN3);
+  //Serial.print("circuit3State ");
+  //Serial.println(circuit3State);
+
+  if (circuit3State == LOW && circuitOn == false) {
+    for (pos = 0; pos <= 180; pos += 1) { // 0 degrees to 180 degrees
+      tongueServo.write(pos);             
+      delay(15);
+    }
+    for (pos = 180; pos >= 0; pos -= 1) { // 180 degrees to 0 degrees
+      tongueServo.write(pos);              
+      delay(15);                       
+    }                  
+  }
 }
